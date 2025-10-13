@@ -220,4 +220,167 @@ describe("第一章：AdvancedToken 基础功能测试", function () {
       ).to.be.revertedWithCustomError(token, "ERC20InsufficientAllowance");
     });
   });
+
+  describe("👑 管理功能测试", function () {
+    it("应该正确设置合约所有者", async function () {
+      console.log("测试：合约所有者应该是部署者");
+      
+      const ownerAddress = await token.getOwner();
+      expect(ownerAddress).to.equal(owner.address);
+      
+      console.log(`合约所有者: ${ownerAddress}`);
+      console.log(`部署者地址: ${owner.address}`);
+    });
+
+    it("应该允许所有者铸造代币", async function () {
+      const mintAmount = ethers.parseUnits("5000", 18);
+      const initialSupply = await token.totalSupply();
+      const user1InitialBalance = await token.balanceOf(user1.address);
+      
+      console.log("铸造前:");
+      console.log(`- 总供应量: ${ethers.formatUnits(initialSupply, 18)} ADV`);
+      console.log(`- user1 余额: ${ethers.formatUnits(user1InitialBalance, 18)} ADV`);
+      
+      // 所有者铸造代币给 user1
+      await token.mint(mintAmount, user1.address);
+      
+      console.log("铸造后:");
+      console.log(`- 总供应量: ${ethers.formatUnits(await token.totalSupply(), 18)} ADV`);
+      console.log(`- user1 余额: ${ethers.formatUnits(await token.balanceOf(user1.address), 18)} ADV`);
+      
+      // 验证铸造结果
+      expect(await token.totalSupply()).to.equal(initialSupply + mintAmount);
+      expect(await token.balanceOf(user1.address)).to.equal(user1InitialBalance + mintAmount);
+    });
+
+    it("应该拒绝非所有者铸造代币", async function () {
+      const mintAmount = ethers.parseUnits("1000", 18);
+      
+      console.log("测试：非所有者不能铸造代币");
+      
+      await expect(
+        token.connect(user1).mint(mintAmount, user2.address)
+      ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+    });
+
+    it("应该拒绝向零地址铸造代币", async function () {
+      const mintAmount = ethers.parseUnits("1000", 18);
+      
+      console.log("测试：不能向零地址铸造代币");
+      
+      await expect(
+        token.mint(mintAmount, ethers.ZeroAddress)
+      ).to.be.revertedWith("AdvancedToken: cannot mint to zero address");
+    });
+
+    it("应该允许所有者暂停合约", async function () {
+      console.log("测试：所有者可以暂停合约");
+      
+      expect(await token.getPaused()).to.be.false;
+      
+      await token.pause();
+      
+      expect(await token.getPaused()).to.be.true;
+      console.log("合约已暂停");
+    });
+
+    it("应该拒绝非所有者暂停合约", async function () {
+      console.log("测试：非所有者不能暂停合约");
+      
+      await expect(
+        token.connect(user1).pause()
+      ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+    });
+
+    it("应该允许所有者恢复合约", async function () {
+      // 先暂停合约
+      await token.pause();
+      expect(await token.getPaused()).to.be.true;
+      
+      console.log("测试：所有者可以恢复合约");
+      
+      await token.unpause();
+      
+      expect(await token.getPaused()).to.be.false;
+      console.log("合约已恢复");
+    });
+
+    it("应该拒绝非所有者恢复合约", async function () {
+      // 先暂停合约
+      await token.pause();
+      
+      console.log("测试：非所有者不能恢复合约");
+      
+      await expect(
+        token.connect(user1).unpause()
+      ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  describe("⏸️ 暂停状态测试", function () {
+    beforeEach(async function () {
+      // 暂停合约
+      await token.pause();
+    });
+
+    it("应该拒绝暂停状态下的转账", async function () {
+      const transferAmount = ethers.parseUnits("100", 18);
+      
+      console.log("测试：暂停状态下不能转账");
+      
+      await expect(
+        token.transfer(user1.address, transferAmount)
+      ).to.be.revertedWithCustomError(token, "EnforcedPause");
+    });
+
+    it("应该拒绝暂停状态下的授权", async function () {
+      const approveAmount = ethers.parseUnits("100", 18);
+      
+      console.log("测试：暂停状态下不能授权");
+      
+      await expect(
+        token.approve(user1.address, approveAmount)
+      ).to.be.revertedWithCustomError(token, "EnforcedPause");
+    });
+
+    it("应该拒绝暂停状态下的销毁", async function () {
+      const burnAmount = ethers.parseUnits("100", 18);
+      
+      console.log("测试：暂停状态下不能销毁");
+      
+      await expect(
+        token.burn(burnAmount)
+      ).to.be.revertedWithCustomError(token, "EnforcedPause");
+    });
+
+    it("应该拒绝暂停状态下的 burnFrom", async function () {
+      // 先给 user1 一些代币并授权
+      await token.unpause(); // 临时恢复以设置测试环境
+      const transferAmount = ethers.parseUnits("1000", 18);
+      await token.transfer(user1.address, transferAmount);
+      await token.connect(user1).approve(user2.address, ethers.parseUnits("100", 18));
+      await token.pause(); // 重新暂停
+      
+      const burnAmount = ethers.parseUnits("100", 18);
+      
+      console.log("测试：暂停状态下不能 burnFrom");
+      
+      await expect(
+        token.connect(user2).burnFrom(user1.address, burnAmount)
+      ).to.be.revertedWithCustomError(token, "EnforcedPause");
+    });
+
+    it("应该允许暂停状态下的铸造（仅所有者）", async function () {
+      const mintAmount = ethers.parseUnits("1000", 18);
+      const initialSupply = await token.totalSupply();
+      
+      console.log("测试：暂停状态下所有者仍可以铸造");
+      
+      // 所有者即使在暂停状态下也可以铸造
+      await token.mint(mintAmount, user1.address);
+      
+      expect(await token.totalSupply()).to.equal(initialSupply + mintAmount);
+      expect(await token.balanceOf(user1.address)).to.equal(mintAmount);
+    });
+  });
 });
