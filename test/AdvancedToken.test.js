@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 
-describe("第一章：AdvancedToken 基础功能测试", function () {
+describe("AdvancedToken 核心功能测试", function () {
   let AdvancedToken;
   let token;
   let owner;    // 合约部署者
@@ -68,6 +68,11 @@ describe("第一章：AdvancedToken 基础功能测试", function () {
   });
 
   describe("🔄 转账功能测试", function () {
+    beforeEach(async function () {
+      // 关闭白名单以测试基础转账功能
+      await token.setWhitelistEnabled(false);
+    });
+
     it("应该允许代币转账", async function () {
       // 转账 100 ADV 给 user1
       const transferAmount = ethers.parseUnits("100", 18);
@@ -100,6 +105,11 @@ describe("第一章：AdvancedToken 基础功能测试", function () {
   });
 
   describe("🔥 销毁功能测试", function () {
+    beforeEach(async function () {
+      // 关闭白名单以测试基础销毁功能
+      await token.setWhitelistEnabled(false);
+    });
+
     it("应该允许用户销毁自己的代币", async function () {
       // 先给 user1 一些代币
       const transferAmount = ethers.parseUnits("1000", 18);
@@ -319,6 +329,8 @@ describe("第一章：AdvancedToken 基础功能测试", function () {
 
   describe("⏸️ 暂停状态测试", function () {
     beforeEach(async function () {
+      // 关闭白名单以测试暂停功能
+      await token.setWhitelistEnabled(false);
       // 暂停合约
       await token.pause();
     });
@@ -381,6 +393,428 @@ describe("第一章：AdvancedToken 基础功能测试", function () {
       
       expect(await token.totalSupply()).to.equal(initialSupply + mintAmount);
       expect(await token.balanceOf(user1.address)).to.equal(mintAmount);
+    });
+  });
+
+  describe("👥 白名单功能测试", function () {
+    it("应该正确设置初始白名单状态", async function () {
+      console.log("测试：检查初始白名单状态");
+      
+      // 部署者应该在白名单中
+      expect(await token.isWhitelisted(owner.address)).to.be.true;
+      console.log("✅ 部署者在白名单中");
+      
+      // 其他用户不在白名单中
+      expect(await token.isWhitelisted(user1.address)).to.be.false;
+      expect(await token.isWhitelisted(user2.address)).to.be.false;
+      console.log("✅ 其他用户不在白名单中");
+      
+      // 白名单应该默认开启
+      expect(await token.whistelistEnabled()).to.be.true;
+      console.log("✅ 白名单默认开启");
+    });
+
+    it("应该允许所有者添加地址到白名单", async function () {
+      console.log("测试：所有者添加地址到白名单");
+      
+      // 添加前检查
+      expect(await token.isWhitelisted(user1.address)).to.be.false;
+      
+      // 添加用户1到白名单
+      await token.setWhitelist(user1.address, true);
+      
+      // 添加后检查
+      expect(await token.isWhitelisted(user1.address)).to.be.true;
+      console.log("✅ 用户1已添加到白名单");
+    });
+
+    it("应该允许所有者从白名单移除地址", async function () {
+      console.log("测试：所有者从白名单移除地址");
+      
+      // 先将用户1添加到白名单
+      await token.setWhitelist(user1.address, true);
+      expect(await token.isWhitelisted(user1.address)).to.be.true;
+      
+      // 从白名单移除用户1
+      await token.setWhitelist(user1.address, false);
+      
+      // 移除后检查
+      expect(await token.isWhitelisted(user1.address)).to.be.false;
+      console.log("✅ 用户1已从白名单移除");
+    });
+
+    it("应该允许批量添加地址到白名单", async function () {
+      console.log("测试：批量添加地址到白名单");
+      
+      const addresses = [user1.address, user2.address];
+      
+      // 批量添加前检查
+      for (const addr of addresses) {
+        expect(await token.isWhitelisted(addr)).to.be.false;
+      }
+      
+      // 批量添加到白名单
+      await token.batchSetWhitelist(addresses, true);
+      
+      // 批量添加后检查
+      for (const addr of addresses) {
+        expect(await token.isWhitelisted(addr)).to.be.true;
+        console.log(`✅ ${addr} 已添加到白名单`);
+      }
+    });
+
+    it("应该允许批量从白名单移除地址", async function () {
+      console.log("测试：批量从白名单移除地址");
+      
+      const addresses = [user1.address, user2.address];
+      
+      // 先批量添加到白名单
+      await token.batchSetWhitelist(addresses, true);
+      
+      // 验证已添加
+      for (const addr of addresses) {
+        expect(await token.isWhitelisted(addr)).to.be.true;
+      }
+      
+      // 批量从白名单移除
+      await token.batchSetWhitelist(addresses, false);
+      
+      // 批量移除后检查
+      for (const addr of addresses) {
+        expect(await token.isWhitelisted(addr)).to.be.false;
+        console.log(`✅ ${addr} 已从白名单移除`);
+      }
+    });
+
+    it("应该允许所有者开启/关闭白名单", async function () {
+      console.log("测试：所有者可以开启/关闭白名单");
+      
+      // 确认初始状态为开启
+      expect(await token.whistelistEnabled()).to.be.true;
+      
+      // 关闭白名单
+      await token.setWhitelistEnabled(false);
+      expect(await token.whistelistEnabled()).to.be.false;
+      console.log("✅ 白名单已关闭");
+      
+      // 开启白名单
+      await token.setWhitelistEnabled(true);
+      expect(await token.whistelistEnabled()).to.be.true;
+      console.log("✅ 白名单已开启");
+    });
+
+    it("应该拒绝非所有者操作白名单", async function () {
+      console.log("测试：非所有者不能操作白名单");
+      
+      // 非所有者尝试添加白名单
+      await expect(
+        token.connect(user1).setWhitelist(user2.address, true)
+      ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+      
+      // 非所有者尝试批量操作
+      await expect(
+        token.connect(user1).batchSetWhitelist([user2.address], true)
+      ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+      
+      // 非所有者尝试开关白名单
+      await expect(
+        token.connect(user1).setWhitelistEnabled(false)
+      ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+      
+      console.log("✅ 非所有者不能操作白名单");
+    });
+
+    it("应该拒绝零地址操作", async function () {
+      console.log("测试：不能对零地址操作白名单");
+      
+      await expect(
+        token.setWhitelist(ethers.ZeroAddress, true)
+      ).to.be.revertedWith("AdvancedToken: zero address");
+      
+      await expect(
+        token.batchSetWhitelist([ethers.ZeroAddress], true)
+      ).to.be.revertedWith("AdvancedToken: zero address");
+      
+      console.log("✅ 不能对零地址操作白名单");
+    });
+
+    it("应该拒绝空地址数组的批量操作", async function () {
+      console.log("测试：不能对空地址数组进行批量操作");
+      
+      const emptyAddresses = [];
+      
+      await expect(
+        token.batchSetWhitelist(emptyAddresses, true)
+      ).to.be.revertedWith("AdvancedToken: accounts is empty");
+      
+      console.log("✅ 不能对空地址数组进行批量操作");
+    });
+  });
+
+  describe("🚫 白名单限制测试", function () {
+    beforeEach(async function () {
+      // 确保白名单开启
+      await token.setWhitelistEnabled(true);
+      // 将用户1添加到白名单，用户2不在白名单中
+      await token.setWhitelist(user1.address, true);
+    });
+
+    it("应该允许白名单用户之间转账", async function () {
+      console.log("测试：白名单用户之间可以转账");
+      
+      const transferAmount = ethers.parseUnits("100", 18);
+      
+      // 先将用户2也添加到白名单
+      await token.setWhitelist(user2.address, true);
+      
+      // 从部署者（在白名单中）转账给用户1（在白名单中）
+      await token.transfer(user1.address, transferAmount);
+      
+      // 从用户1转账给用户2（都在白名单中）
+      await token.connect(user1).transfer(user2.address, transferAmount);
+      
+      expect(await token.balanceOf(user2.address)).to.equal(transferAmount);
+      console.log("✅ 白名单用户之间转账成功");
+    });
+
+    it("应该拒绝白名单用户向非白名单用户转账", async function () {
+      console.log("测试：白名单用户不能向非白名单用户转账");
+      
+      const transferAmount = ethers.parseUnits("100", 18);
+      
+      // 先给用户1一些代币
+      await token.transfer(user1.address, transferAmount);
+      
+      // 用户1（在白名单中）尝试向用户2（不在白名单中）转账
+      await expect(
+        token.connect(user1).transfer(user2.address, transferAmount)
+      ).to.be.revertedWith("AdvancedToken: receiver not in whitelist");
+      
+      console.log("✅ 白名单用户不能向非白名单用户转账");
+    });
+
+    it("应该拒绝非白名单用户转账", async function () {
+      console.log("测试：非白名单用户不能转账");
+      
+      const transferAmount = ethers.parseUnits("100", 18);
+      
+      // 先关闭白名单，给用户2一些代币，然后重新开启白名单
+      await token.setWhitelistEnabled(false);
+      await token.transfer(user2.address, transferAmount);
+      await token.setWhitelistEnabled(true);
+      
+      // 用户2（不在白名单中）尝试转账
+      await expect(
+        token.connect(user2).transfer(user1.address, transferAmount)
+      ).to.be.revertedWith("AdvancedToken: sender not in whitelist");
+      
+      console.log("✅ 非白名单用户不能转账");
+    });
+
+    it("应该允许白名单用户授权给白名单用户", async function () {
+      console.log("测试：白名单用户可以向白名单用户授权");
+      
+      const approveAmount = ethers.parseUnits("100", 18);
+      
+      // 先将用户2也添加到白名单
+      await token.setWhitelist(user2.address, true);
+      
+      // 用户1（在白名单中）授权给用户2（在白名单中）
+      await token.connect(user1).approve(user2.address, approveAmount);
+      
+      expect(await token.allowance(user1.address, user2.address)).to.equal(approveAmount);
+      console.log("✅ 白名单用户之间授权成功");
+    });
+
+    it("应该拒绝白名单用户授权给非白名单用户", async function () {
+      console.log("测试：白名单用户不能授权给非白名单用户");
+      
+      const approveAmount = ethers.parseUnits("100", 18);
+      
+      // 用户1（在白名单中）尝试授权给用户2（不在白名单中）
+      await expect(
+        token.connect(user1).approve(user2.address, approveAmount)
+      ).to.be.revertedWith("AdvancedToken: receiver not in whitelist");
+      
+      console.log("✅ 白名单用户不能授权给非白名单用户");
+    });
+
+    it("应该拒绝非白名单用户授权", async function () {
+      console.log("测试：非白名单用户不能授权");
+      
+      const approveAmount = ethers.parseUnits("100", 18);
+      
+      // 先关闭白名单，给用户2一些代币，然后重新开启白名单
+      await token.setWhitelistEnabled(false);
+      await token.transfer(user2.address, approveAmount);
+      await token.setWhitelistEnabled(true);
+      
+      // 用户2（不在白名单中）尝试授权
+      await expect(
+        token.connect(user2).approve(user1.address, approveAmount)
+      ).to.be.revertedWith("AdvancedToken: sender not in whitelist");
+      
+      console.log("✅ 非白名单用户不能授权");
+    });
+  });
+
+  describe("🔓 白名单关闭时的行为测试", function () {
+    beforeEach(async function () {
+      // 关闭白名单
+      await token.setWhitelistEnabled(false);
+    });
+
+    it("应该允许任意用户之间转账（白名单关闭）", async function () {
+      console.log("测试：白名单关闭时，任意用户之间可以转账");
+      
+      const transferAmount = ethers.parseUnits("100", 18);
+      
+      // 给用户1一些代币
+      await token.transfer(user1.address, transferAmount);
+      
+      // 用户1转账给用户2（都不在白名单中，但白名单已关闭）
+      await token.connect(user1).transfer(user2.address, transferAmount);
+      
+      expect(await token.balanceOf(user2.address)).to.equal(transferAmount);
+      console.log("✅ 白名单关闭时，任意用户之间可以转账");
+    });
+
+    it("应该允许任意用户授权（白名单关闭）", async function () {
+      console.log("测试：白名单关闭时，任意用户可以授权");
+      
+      const approveAmount = ethers.parseUnits("100", 18);
+      
+      // 给用户1一些代币
+      await token.transfer(user1.address, approveAmount);
+      
+      // 用户1授权给用户2（都不在白名单中，但白名单已关闭）
+      await token.connect(user1).approve(user2.address, approveAmount);
+      
+      expect(await token.allowance(user1.address, user2.address)).to.equal(approveAmount);
+      console.log("✅ 白名单关闭时，任意用户可以授权");
+    });
+  });
+
+  describe("📢 白名单事件测试", function () {
+    it("应该触发白名单更新事件", async function () {
+      console.log("测试：白名单更新应该触发事件");
+      
+      // 监听事件
+      const tx = await token.setWhitelist(user1.address, true);
+      const receipt = await tx.wait();
+      
+      // 查找事件
+      const event = receipt.logs.find(log => {
+        try {
+          const decoded = token.interface.parseLog(log);
+          return decoded.name === "WhitelistUpdated";
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      expect(event).to.not.be.undefined;
+      
+      const decodedEvent = token.interface.parseLog(event);
+      expect(decodedEvent.args.account).to.equal(user1.address);
+      expect(decodedEvent.args.status).to.be.true;
+      
+      console.log("✅ 白名单更新事件触发成功");
+    });
+
+    it("应该触发白名单开关事件", async function () {
+      console.log("测试：白名单开关应该触发事件");
+      
+      // 监听事件
+      const tx = await token.setWhitelistEnabled(false);
+      const receipt = await tx.wait();
+      
+      // 查找事件
+      const event = receipt.logs.find(log => {
+        try {
+          const decoded = token.interface.parseLog(log);
+          return decoded.name === "WhitelistEnableUpdated";
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      expect(event).to.not.be.undefined;
+      
+      const decodedEvent = token.interface.parseLog(event);
+      expect(decodedEvent.args.enabled).to.be.false;
+      
+      console.log("✅ 白名单开关事件触发成功");
+    });
+
+    it("应该触发批量白名单更新事件", async function () {
+      console.log("测试：批量白名单更新应该触发事件");
+      
+      const addresses = [user1.address, user2.address];
+      
+      // 监听事件
+      const tx = await token.batchSetWhitelist(addresses, true);
+      const receipt = await tx.wait();
+      
+      // 查找事件
+      const event = receipt.logs.find(log => {
+        try {
+          const decoded = token.interface.parseLog(log);
+          return decoded.name === "WhitelistBatchUpdated";
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      expect(event).to.not.be.undefined;
+      
+      const decodedEvent = token.interface.parseLog(event);
+      expect(decodedEvent.args.accounts).to.deep.equal(addresses);
+      expect(decodedEvent.args.status).to.be.true;
+      
+      console.log("✅ 批量白名单更新事件触发成功");
+    });
+  });
+
+  describe("🔄 白名单状态切换测试", function () {
+    it("应该正确处理白名单状态的动态切换", async function () {
+      console.log("测试：白名单状态动态切换");
+      
+      const transferAmount = ethers.parseUnits("100", 18);
+      
+      // 初始状态：白名单开启，只有部署者在白名单中
+      expect(await token.whistelistEnabled()).to.be.true;
+      expect(await token.isWhitelisted(owner.address)).to.be.true;
+      expect(await token.isWhitelisted(user1.address)).to.be.false;
+      
+      // 先关闭白名单，给用户1一些代币，然后重新开启白名单
+      await token.setWhitelistEnabled(false);
+      await token.transfer(user1.address, transferAmount);
+      await token.setWhitelistEnabled(true);
+      
+      // 用户1尝试转账（应该失败，因为不在白名单中）
+      await expect(
+        token.connect(user1).transfer(user2.address, transferAmount)
+      ).to.be.revertedWith("AdvancedToken: sender not in whitelist");
+      
+      // 关闭白名单
+      await token.setWhitelistEnabled(false);
+      expect(await token.whistelistEnabled()).to.be.false;
+      
+      // 现在用户1应该可以转账了
+      await token.connect(user1).transfer(user2.address, transferAmount);
+      expect(await token.balanceOf(user2.address)).to.equal(transferAmount);
+      
+      // 重新开启白名单
+      await token.setWhitelistEnabled(true);
+      expect(await token.whistelistEnabled()).to.be.true;
+      
+      // 用户2尝试转账（应该失败，因为不在白名单中）
+      await expect(
+        token.connect(user2).transfer(user1.address, transferAmount)
+      ).to.be.revertedWith("AdvancedToken: sender not in whitelist");
+      
+      console.log("✅ 白名单状态动态切换测试成功");
     });
   });
 });

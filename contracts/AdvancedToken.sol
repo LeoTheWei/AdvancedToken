@@ -3,114 +3,205 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-// 导入销毁功能
+// Import burn functionality
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-// 导入管理功能
+// Import management functionality
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "hardhat/console.sol";
 
 /**
  * @title AdvancedToken
- * @dev 高级代币合约，继承自 ERC20 标准，并添加销毁功能
+ * @dev Advanced token contract, inheriting from ERC20 standard and adding burn functionality
  */
 
 contract AdvancedToken is ERC20, ERC20Burnable, Ownable, Pausable {
 
+    // ============= Whitelist State Variables =============
+    // Whitelist mapping to record which addresses can trade
+    mapping(address => bool) public whiteList;
+    // Whitelist switch: whether to enable whitelist
+    bool public whistelistEnabled;
+
+
+    // ============== Events ==============
+    event WhitelistUpdated(address indexed account, bool status);
+    event WhitelistEnableUpdated(bool enabled);
+    event WhitelistBatchUpdated(address[] accounts, bool status);
+
     /**
-    * @dev 构造函数，设置代币名称、符号和初始供应量
-    * @param initialSupply 初始供应量
-    * - msg.sender 部署者
-    * - initialSupply 初始供应量
-    * - 10 ** decimals() 转换为最小单位（1 ADV = 10^18 个最小单位）
-    * - Ownable(msg.sender) 将所有权转移给部署者
+    * @dev Constructor, sets token name, symbol and initial supply
+    * @param initialSupply Initial supply
+    * - msg.sender Deployer
+    * - initialSupply Initial supply
+    * - 10 ** decimals() Convert to smallest unit (1 ADV = 10^18 smallest units)
+    * - Ownable(msg.sender) Transfer ownership to deployer
     */
     constructor(uint256 initialSupply) ERC20("AdvancedToken", "ADV") Ownable(msg.sender) {
-        // 向部署者开始部署初始代币
+        // Mint initial tokens to deployer
         _mint(msg.sender, initialSupply * 10 ** decimals());
+
+        // Add deployer to whitelist by default
+        whiteList[msg.sender] = true;
+        // Enable whitelist by default
+        whistelistEnabled = true;
     }
 
-    // 管理员铸造币的功能
+
+    // ============== Whitelist Functions =============
     /**
      * 
-     * @param amount 铸造数量
-     * @param to 铸造地址
+     * @dev Admin sets whitelist
+     * @param account Address to modify
+     * @param status Status true means add to whitelist, false means remove from whitelist
+     */
+    function setWhitelist(address account, bool status) public onlyOwner {
+        require(account != address(0), "AdvancedToken: zero address" );
+        whiteList[account] = status;
+        emit WhitelistUpdated(account, status);
+        console.log("Whitelist updated:", account, status ? "added" : "removed");
+    }
+
+    /**
+     * 
+     * @dev Admin batch sets whitelist
+     * @param accounts Addresses to modify
+     * @param status Status true means add to whitelist, false means remove from whitelist
+     */
+    function batchSetWhitelist(address[] memory accounts, bool status) public onlyOwner {
+        require(accounts.length > 0, "AdvancedToken: accounts is empty");
+        
+        for (uint256 i = 0; i < accounts.length; i++) {
+            require(accounts[i] != address(0), "AdvancedToken: zero address");
+            whiteList[accounts[i]] = status;
+        }
+
+        emit WhitelistBatchUpdated(accounts, status);
+        console.log("Batch whitelist update:", accounts.length, "addresses", status ? "added" : "removed");
+    }
+
+    /**
+     * 
+     * @dev Admin enables/disables whitelist restriction
+     * @param enabled Status true means enable whitelist, false means disable whitelist
+     */
+    function setWhitelistEnabled(bool enabled) public onlyOwner {
+        whistelistEnabled = enabled;
+        emit WhitelistEnableUpdated(enabled);
+        console.log("Whitelist switch:", enabled ? "enabled" : "disabled");
+    }
+
+    /**
+     * 
+     * @dev Check if address is in whitelist
+     * @param account Address to check
+     * @return Whether in whitelist
+     */
+    function isWhitelisted(address account) public view returns (bool) {
+        return whiteList[account];
+    }
+
+    // Admin minting functionality
+    /**
+     * 
+     * @param amount Amount to mint
+     * @param to Address to mint to
      */
     function mint(uint256 amount, address to) public onlyOwner {
         require(to != address(0), "AdvancedToken: cannot mint to zero address");
-        console.log(unicode"铸造代币");
-        console.log(unicode"铸造数量", amount);
-        console.log(unicode"接受地址", to);
-        console.log(unicode"铸造时间", block.timestamp);
-        console.log(unicode"铸造区块", block.number);
-        console.log(unicode"铸造交易", _msgSender());
+        console.log("Minting tokens");
+        console.log("Mint amount", amount);
+        console.log("Recipient address", to);
+        console.log("Mint timestamp", block.timestamp);
+        console.log("Mint block", block.number);
+        console.log("Mint transaction", _msgSender());
         
-        // 调用父类铸造函数
+        // Call parent class minting function
         _mint(to, amount);
     }
 
-    // 暂停/恢复功能
+    // Pause/Resume functionality
     /**
      * 
-     * @dev 暂停/恢复功能 只有部署者可以暂停/恢复
-     *  停止所有的转账操作
+     * @dev Pause/Resume functionality, only deployer can pause/resume
+     *  Stop all transfer operations
      */
      function pause() public onlyOwner {
-        console.log(unicode"合约已暂停");
+        console.log("Contract paused");
         _pause();
     }
     /**
      * 
-     * @dev 恢复代币
-     *  恢复所有的转账操作
+     * @dev Resume token
+     *  Resume all transfer operations
      */
     function unpause() public onlyOwner {
-        console.log(unicode"合约已恢复");
+        console.log("Contract unpaused");
         _unpause();
     }
 
 
-    // 重写转账的函数和授权的函数，添加暂停检查
+    // ============== Override transfer and approval functions, add pause check and whitelist check =============
     /**
-     * @dev 重写转账的函数和授权的函数，添加暂停检查
+     * @dev Override transfer and approval functions, add pause check
      */
     function transfer(address to, uint256 amount) public virtual override whenNotPaused returns (bool) {
-        console.log(unicode"转账代币");
+        console.log("Transferring tokens");
+        _checkWhitelist(msg.sender, to);
         return super.transfer(to, amount);
     }
 
     /**
-     * @dev 重写授权的函数，添加暂停检查
+     * @dev Override approval function, add pause check and whitelist check
      */
     function approve(address spender, uint256 amount) public virtual override whenNotPaused returns (bool) {
-        console.log(unicode"授权代币");
+        console.log("Approving tokens");
+        _checkWhitelist(msg.sender, spender);
         return super.approve(spender, amount);
     }
 
 
+    // =========================== Internal Functions ==========================
+    /**
+     * 
+     * @dev Internal function: Check whitelist
+     * @param from Sender
+     * @param to Receiver
+     */
+    function _checkWhitelist(address from, address to) internal view {
+        // If whitelist switch is off, don't check whitelist
+        if (!whistelistEnabled) {
+            return;
+        }
+        // Check if sender is in whitelist
+        require(whiteList[from], "AdvancedToken: sender not in whitelist");
+        // Check if receiver is in whitelist
+        require(whiteList[to], "AdvancedToken: receiver not in whitelist");
+    }
+
 
     /**
-     * @dev 销毁代币
-     * @param amount 销毁数量 
+     * @dev Burn tokens
+     * @param amount Amount to burn
      * 
-     * -- 任何用户都可以销毁自己的代币
-     * -- 销毁代币后，代币总数据减少
-     * -- 会触发Transfer事件 （转到零地址）
+     * -- Any user can burn their own tokens
+     * -- After burning tokens, total token supply decreases
+     * -- Will trigger Transfer event (to zero address)
      */
 
     function burn(uint256 amount) public virtual override whenNotPaused {
-        // 调用父类销毁函数
+        // Call parent class burn function
         super.burn(amount);
     }
     
 
     /**
-     * @dev 销毁代币 - 允许销毁他人的代币
-     * @param account 销毁账户
-     * @param amount 销毁数量
+     * @dev Burn tokens - Allow burning others' tokens
+     * @param account Account to burn from
+     * @param amount Amount to burn
      * 
-     * -- 允许销毁他人的代币，去中心化交易所可以销毁用户的代币（如果用户授权）
-     * -- 合约可以按规则自动销毁代币
+     * -- Allow burning others' tokens, DEX can burn user tokens (if user authorized)
+     * -- Contract can automatically burn tokens according to rules
      */
      function burnFrom(address account, uint256 amount) public override whenNotPaused {
         super.burnFrom(account, amount);
@@ -118,16 +209,16 @@ contract AdvancedToken is ERC20, ERC20Burnable, Ownable, Pausable {
 
 
 
-    // 视图函数 
+    // View functions
     /**
-     * @dev 获取合约的所有者
+     * @dev Get contract owner
      */
     function getOwner() public view returns (address) {
         return owner();
     }
 
     /**
-     * @dev 获取合约的暂停状态
+     * @dev Get contract pause status
      */
     function getPaused() public view returns (bool) {
         return paused();
