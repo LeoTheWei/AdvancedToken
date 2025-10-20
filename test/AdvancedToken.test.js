@@ -69,8 +69,9 @@ describe("AdvancedToken 核心功能测试", function () {
 
   describe("🔄 转账功能测试", function () {
     beforeEach(async function () {
-      // 关闭白名单以测试基础转账功能
+      // 关闭白名单和手续费以测试基础转账功能
       await token.setWhitelistEnabled(false);
+      await token.setTaxEnabled(false);
     });
 
     it("应该允许代币转账", async function () {
@@ -106,8 +107,9 @@ describe("AdvancedToken 核心功能测试", function () {
 
   describe("🔥 销毁功能测试", function () {
     beforeEach(async function () {
-      // 关闭白名单以测试基础销毁功能
+      // 关闭白名单和手续费以测试基础销毁功能
       await token.setWhitelistEnabled(false);
+      await token.setTaxEnabled(false);
     });
 
     it("应该允许用户销毁自己的代币", async function () {
@@ -329,8 +331,9 @@ describe("AdvancedToken 核心功能测试", function () {
 
   describe("⏸️ 暂停状态测试", function () {
     beforeEach(async function () {
-      // 关闭白名单以测试暂停功能
+      // 关闭白名单和手续费以测试暂停功能
       await token.setWhitelistEnabled(false);
+      await token.setTaxEnabled(false);
       // 暂停合约
       await token.pause();
     });
@@ -553,8 +556,9 @@ describe("AdvancedToken 核心功能测试", function () {
 
   describe("🚫 白名单限制测试", function () {
     beforeEach(async function () {
-      // 确保白名单开启
+      // 确保白名单开启，手续费关闭
       await token.setWhitelistEnabled(true);
+      await token.setTaxEnabled(false);
       // 将用户1添加到白名单，用户2不在白名单中
       await token.setWhitelist(user1.address, true);
     });
@@ -660,8 +664,9 @@ describe("AdvancedToken 核心功能测试", function () {
 
   describe("🔓 白名单关闭时的行为测试", function () {
     beforeEach(async function () {
-      // 关闭白名单
+      // 关闭白名单和手续费
       await token.setWhitelistEnabled(false);
+      await token.setTaxEnabled(false);
     });
 
     it("应该允许任意用户之间转账（白名单关闭）", async function () {
@@ -787,8 +792,9 @@ describe("AdvancedToken 核心功能测试", function () {
       expect(await token.isWhitelisted(owner.address)).to.be.true;
       expect(await token.isWhitelisted(user1.address)).to.be.false;
       
-      // 先关闭白名单，给用户1一些代币，然后重新开启白名单
+      // 先关闭白名单和手续费，给用户1一些代币，然后重新开启白名单
       await token.setWhitelistEnabled(false);
+      await token.setTaxEnabled(false);
       await token.transfer(user1.address, transferAmount);
       await token.setWhitelistEnabled(true);
       
@@ -817,4 +823,5 @@ describe("AdvancedToken 核心功能测试", function () {
       console.log("✅ 白名单状态动态切换测试成功");
     });
   });
+
 });
