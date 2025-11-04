@@ -1,0 +1,28 @@
+{
+  "network": "sepolia",
+  "contractAddress": "0x32621E05c42A5B03Eec24892d9Dafe42b2852e54",
+  "deployer": "0xffE882596fccc7f9F14C11B3B94d8C28D500E4f7",
+  "deploymentTime": "2025-10-23T00:29:40.054Z",
+  "contractInfo": {
+    "name": "AdvancedToken",
+    "symbol": "ADV",
+    "decimals": "18",
+    "totalSupply": "1000000000000000000000000000000000000000000",
+    "governance": {
+      "votingDelay": "86400",
+      "votingPeriod": "259200",
+      "proposalThreshold": "1000000000000000000000",
+      "quorumVotes": "10000000000000000000000",
+      "timelockDelay": "86400"
+    },
+    "tax": {
+      "rate": "200",
+      "enabled": true,
+      "receiver": "0xffE882596fccc7f9F14C11B3B94d8C28D500E4f7"
+    },
+    "burn": {
+      "percentage": "5000",
+      "enabled": true
+    }
+  }
+}

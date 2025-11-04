@@ -4,7 +4,16 @@
   "description": "**项目名称**：AdvancedToken   **项目周期**：约 3 周   **目标**：构建一个具有白名单、手续费、销毁和治理功能的高级 ERC20 智能合约，部署到以太坊测试网（Sepolia），并完成单元测试。",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx hardhat test",
+    "compile": "npx hardhat compile",
+    "test:connection": "npx hardhat run scripts/test-connection.js --network sepolia",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
+    "verify:sepolia": "npx hardhat run scripts/verify.js --network sepolia",
+    "interact:sepolia": "npx hardhat run scripts/interact.js --network sepolia",
+    "deploy:local": "npx hardhat run scripts/quick-deploy.js --network localhost",
+    "node": "npx hardhat node",
+    "console": "npx hardhat console --network localhost",
+    "clean": "npx hardhat clean"
   },
   "repository": {
     "type": "git",
@@ -24,16 +33,19 @@
     "@nomicfoundation/hardhat-network-helpers": "^1.1.0",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.1.1",
+    "@nomiclabs/hardhat-etherscan": "^3.1.8",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^4.3.20",
     "@types/mocha": "^9.1.1",
     "@types/node": "^18.19.130",
     "chai": "^4.5.0",
+    "dotenv": "^17.2.3",
     "ethers": "^6.15.0",
     "hardhat": "^2.26.3",
     "hardhat-gas-reporter": "^1.0.10",
     "solidity-coverage": "^0.8.16",
+    "truffle-flattener": "^1.6.0",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
     "typescript": "^4.9.5"

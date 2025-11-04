@@ -247,11 +247,12 @@ describe("AdvancedToken 代币销毁功能测试", function () {
       const expectedReceiverAmount = ethers.parseUnits("5", 18); // 5 ADV (50% of tax)
       const expectedNetAmount = ethers.parseUnits("490", 18); // 490 ADV
       
-      // 先给user1一些代币
-      await token.transfer(user1.address, transferAmount);
+      // 先给user1足够的代币（包括手续费）
+      const totalAmount = transferAmount + expectedTax; // 500 + 10 = 510 ADV
+      await token.transfer(user1.address, totalAmount);
       
-      // user1授权给user2
-      await token.connect(user1).approve(user2.address, transferAmount);
+      // user1授权给user2（授权总金额，包括手续费）
+      await token.connect(user1).approve(user2.address, totalAmount);
       
       // 记录转账前状态
       const user1InitialBalance = await token.balanceOf(user1.address);
@@ -384,7 +385,8 @@ describe("AdvancedToken 代币销毁功能测试", function () {
       await token.setBurnEnabled(true);
       
       const transferAmount = ethers.parseUnits("1000", 18);
-      const expectedTaxAmount = ethers.parseUnits("20", 18); // 20 ADV (2%)
+      const totalTaxAmount = ethers.parseUnits("20", 18); // 20 ADV (2%)
+      const expectedReceiverAmount = ethers.parseUnits("10", 18); // 10 ADV (50% of tax)
       
       // 监听事件
       const tx = await token.transfer(user1.address, transferAmount);
@@ -404,7 +406,8 @@ describe("AdvancedToken 代币销毁功能测试", function () {
       
       const decodedEvent = token.interface.parseLog(event);
       expect(decodedEvent.args.from).to.equal(owner.address);
-      expect(decodedEvent.args.taxAmount).to.equal(expectedTaxAmount);
+      expect(decodedEvent.args.taxAmount).to.equal(totalTaxAmount);
+      expect(decodedEvent.args.receiverAmount).to.equal(expectedReceiverAmount);
       
       console.log("✅ 手续费分配事件触发成功");
     });

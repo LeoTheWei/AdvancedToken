@@ -18,6 +18,7 @@ describe("AdvancedToken 手续费功能测试", function () {
     
     // 关闭白名单以专注于测试手续费功能
     await token.setWhitelistEnabled(false);
+    await token.setBurnEnabled(false);
     
     // 将手续费接收者设置为user3（与owner不同）
     await token.setTaxReceiver(user3.address);
@@ -174,11 +175,12 @@ describe("AdvancedToken 手续费功能测试", function () {
       const expectedTax = ethers.parseUnits("10", 18); // 10 ADV (2%)
       const expectedNetAmount = ethers.parseUnits("490", 18); // 490 ADV
       
-      // 先给user1一些代币
-      await token.transfer(user1.address, transferAmount);
+      // 先给user1足够的代币（包括手续费）
+      const totalAmount = transferAmount + expectedTax; // 500 + 10 = 510 ADV
+      await token.transfer(user1.address, totalAmount);
       
-      // user1授权给user2
-      await token.connect(user1).approve(user2.address, transferAmount);
+      // user1授权给user2（授权总金额，包括手续费）
+      await token.connect(user1).approve(user2.address, totalAmount);
       
       // 记录转账前余额
       const user1InitialBalance = await token.balanceOf(user1.address);
@@ -250,13 +252,16 @@ describe("AdvancedToken 手续费功能测试", function () {
       const tax1Percent = ethers.parseUnits("10", 18); // 10 ADV
       const netAmount1Percent = ethers.parseUnits("990", 18); // 990 ADV
       
+      // 记录转账前的手续费接收者余额
+      const taxReceiverInitialBalance = await token.balanceOf(await token.taxReceiver());
+      
       await token.transfer(user1.address, transferAmount);
       
       const user1Balance1Percent = await token.balanceOf(user1.address);
       const taxReceiverBalance1Percent = await token.balanceOf(await token.taxReceiver());
       
       expect(user1Balance1Percent).to.equal(netAmount1Percent);
-      expect(taxReceiverBalance1Percent).to.equal(ethers.parseUnits("1000000", 18) + tax1Percent);
+      expect(taxReceiverBalance1Percent).to.equal(taxReceiverInitialBalance + tax1Percent);
       
       console.log("✅ 1%手续费率计算正确");
     });
@@ -271,13 +276,16 @@ describe("AdvancedToken 手续费功能测试", function () {
       const tax05Percent = ethers.parseUnits("5", 18); // 5 ADV
       const netAmount05Percent = ethers.parseUnits("995", 18); // 995 ADV
       
+      // 记录转账前的手续费接收者余额
+      const taxReceiverInitialBalance = await token.balanceOf(await token.taxReceiver());
+      
       await token.transfer(user1.address, transferAmount);
       
       const user1Balance05Percent = await token.balanceOf(user1.address);
       const taxReceiverBalance05Percent = await token.balanceOf(await token.taxReceiver());
       
       expect(user1Balance05Percent).to.equal(netAmount05Percent);
-      expect(taxReceiverBalance05Percent).to.equal(ethers.parseUnits("1000000", 18) + tax05Percent);
+      expect(taxReceiverBalance05Percent).to.equal(taxReceiverInitialBalance + tax05Percent);
       
       console.log("✅ 0.5%手续费率计算正确");
     });
@@ -409,6 +417,9 @@ describe("AdvancedToken 手续费功能测试", function () {
       expect(await token.taxEnabled()).to.be.true;
       expect(await token.taxRate()).to.equal(200);
       
+      // 记录转账前的手续费接收者余额
+      const taxReceiverInitialBalance = await token.balanceOf(await token.taxReceiver());
+      
       // 第一次转账（收取2%手续费）
       await token.transfer(user1.address, transferAmount);
       
@@ -416,7 +427,7 @@ describe("AdvancedToken 手续费功能测试", function () {
       let taxReceiverBalance = await token.balanceOf(await token.taxReceiver());
       
       expect(user1Balance).to.equal(ethers.parseUnits("980", 18)); // 980 ADV
-      expect(taxReceiverBalance).to.equal(ethers.parseUnits("1000000", 18) + ethers.parseUnits("20", 18)); // 1000000 + 20 ADV
+      expect(taxReceiverBalance).to.equal(taxReceiverInitialBalance + ethers.parseUnits("20", 18)); // 初始余额 + 20 ADV
       
       console.log("✅ 2%手续费收取正确");
       
@@ -441,13 +452,16 @@ describe("AdvancedToken 手续费功能测试", function () {
       expect(await token.taxEnabled()).to.be.true;
       expect(await token.taxRate()).to.equal(200);
       
+      // 记录转账前user3的余额
+      const user3InitialBalance = await token.balanceOf(user3.address);
+      
       // 第三次转账（收取2%手续费）
       await token.transfer(user3.address, transferAmount);
       
       let user3Balance = await token.balanceOf(user3.address);
       let taxReceiverBalanceFinal = await token.balanceOf(await token.taxReceiver());
       
-      expect(user3Balance).to.equal(ethers.parseUnits("980", 18)); // 980 ADV
+      expect(user3Balance).to.equal(user3InitialBalance + ethers.parseUnits("980", 18)); // 初始余额 + 980 ADV
       expect(taxReceiverBalanceFinal).to.equal(taxReceiverBalanceAfter + ethers.parseUnits("20", 18)); // 增加20 ADV手续费
       
       console.log("✅ 2%手续费收取正确");
@@ -466,13 +480,16 @@ describe("AdvancedToken 手续费功能测试", function () {
       const expectedTax = ethers.parseUnits("50", 18); // 50 ADV (5%)
       const expectedNetAmount = ethers.parseUnits("950", 18); // 950 ADV
       
+      // 记录转账前的手续费接收者余额
+      const taxReceiverInitialBalance = await token.balanceOf(await token.taxReceiver());
+      
       await token.transfer(user1.address, transferAmount);
       
       const user1Balance = await token.balanceOf(user1.address);
       const taxReceiverBalance = await token.balanceOf(await token.taxReceiver());
       
       expect(user1Balance).to.equal(expectedNetAmount);
-      expect(taxReceiverBalance).to.equal(ethers.parseUnits("1000000", 18) + expectedTax);
+      expect(taxReceiverBalance).to.equal(taxReceiverInitialBalance + expectedTax);
       
       console.log("✅ 5%手续费率计算正确");
     });
@@ -487,13 +504,16 @@ describe("AdvancedToken 手续费功能测试", function () {
       const expectedTax = ethers.parseUnits("0.01", 18); // 0.01 ADV (1%)
       const expectedNetAmount = ethers.parseUnits("0.99", 18); // 0.99 ADV
       
+      // 记录转账前的手续费接收者余额
+      const taxReceiverInitialBalance = await token.balanceOf(await token.taxReceiver());
+      
       await token.transfer(user1.address, transferAmount);
       
       const user1Balance = await token.balanceOf(user1.address);
       const taxReceiverBalance = await token.balanceOf(await token.taxReceiver());
       
       expect(user1Balance).to.equal(expectedNetAmount);
-      expect(taxReceiverBalance).to.equal(ethers.parseUnits("1000000", 18) + expectedTax);
+      expect(taxReceiverBalance).to.equal(taxReceiverInitialBalance + expectedTax);
       
       console.log("✅ 极小转账金额手续费计算正确");
     });
